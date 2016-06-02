@@ -22,17 +22,17 @@ log_and_echo "$LABEL" "No unit tests cases have been checked in"
 # FULL_REPOSITORY_NAME=${REGISTRY_URL}/${IMAGE_NAME}:${APPLICATION_VERSION}
 # If you wish to receive slack notifications, set SLACK_WEBHOOK_PATH as a property on the stage.
 
-if [ -f map-wlpcfg/Dockerfile ]; then 
+if [ -f carroom-wlpcfg/Dockerfile ]; then 
     log_and_echo "$LABEL" "Building ${FULL_REPOSITORY_NAME}"
     ${EXT_DIR}/utilities/sendMessage.sh -l info -m "New container build requested for ${FULL_REPOSITORY_NAME}"
     # build image
     BUILD_COMMAND=""
     if [ "${USE_CACHED_LAYERS}" == "true" ]; then 
-        BUILD_COMMAND="build --pull --tag ${FULL_REPOSITORY_NAME} ${WORKSPACE}/map-wlpcfg"
+        BUILD_COMMAND="build --pull --tag ${FULL_REPOSITORY_NAME} ${WORKSPACE}/carroom-wlpcfg"
         ice_retry ${BUILD_COMMAND}
         RESULT=$?
     else 
-        BUILD_COMMAND="build --no-cache --tag ${FULL_REPOSITORY_NAME} ${WORKSPACE}/map-wlpcfg"
+        BUILD_COMMAND="build --no-cache --tag ${FULL_REPOSITORY_NAME} ${WORKSPACE}/carroom-wlpcfg"
         ice_retry ${BUILD_COMMAND}
         RESULT=$?
     fi 
