@@ -1,0 +1,94 @@
+apply plugin: 'eclipse'
+
+buildscript {
+	repositories {
+	    mavenCentral()
+	}
+
+	dependencies {
+		classpath 'com.bmuschko:gradle-docker-plugin:2.6'
+	}
+}
+
+def dockerHost = "https://localhost:2376"
+if (null != System.getenv("DOCKER_HOST"))
+{
+	dockerHost = System.getenv('DOCKER_HOST')
+
+	if (dockerHost.indexOf('tcp') == 0)
+	{
+		dockerHost = dockerHost.replace('tcp','https')
+	}
+}
+
+def dockerCertPath = ""
+if (null != System.getenv('DOCKER_CERT_PATH')){
+	dockerCertPath = System.getenv('DOCKER_CERT_PATH')
+}
+
+def localEnvironment = ["LICENSE=accept",
+			"service_concierge=" + System.getenv('SERVICE_CONCIERGE'),
+			"service_room=" + System.getenv('SERVICE_ROOM'),
+			"REGISTRATION_SECRET=" + System.getenv('REGISTRATION_SECRET')]
+
+def etcdEnvironment = ["LICENSE=accept",
+							"ETCDCTL_ENDPOINT=http://etcd:4001"]
+
+task copyTask(type: Copy) {
+    from '../carroom-app/build/libs/carroom-app-1.0.war'
+    into 'servers/gameon-carroom/apps/'
+    rename("carroom-app-1.0.war", "carroom-app.war")
+}
+
+task build(dependsOn: ['copyTask']){
+}
+
+apply plugin: 'com.bmuschko.docker-remote-api'
+
+import com.bmuschko.gradle.docker.tasks.container.*
+import com.bmuschko.gradle.docker.tasks.image.*
+
+docker {
+	  url = dockerHost
+    certPath = new File(dockerCertPath)
+}
+
+task buildDockerImage(type: DockerBuildImage, dependsOn: 'copyTask') {
+	inputDir = file('.')
+    tag = 'gameon-carroom'
+    quiet = false
+}
+
+task stopCurrentContainer(type: DockerStopContainer) {
+    targetContainerId { "gameon-carroom" }
+    timeout 0
+}
+
+task removeCurrentContainer(type: DockerRemoveContainer) {
+	targetContainerId { "gameon-carroom" }
+}
+
+task createNewContainer(type: DockerCreateContainer) {
+	targetImageId { "gameon-carroom" }
+	containerName = "gameon-carroom"
+	portBindings = ['5080:9080']
+	env = localEnvironment
+}
+
+task createNewEtcdContainer(type: DockerCreateContainer) {
+	targetImageId { "gameon-carroom" }
+	containerName = "gameon-carroom"
+	portBindings = ['5090:9090']
+	links = ['etcd:etcd']
+	env = etcdEnvironment
+}
+
+task startNewEtcdContainer(type: DockerStartContainer) {
+	dependsOn createNewEtcdContainer
+	targetContainerId { "gameon-carroom" }
+}
+
+task startNewContainer(type: DockerStartContainer) {
+	dependsOn createNewContainer
+	targetContainerId { "gameon-carroom" }
+}

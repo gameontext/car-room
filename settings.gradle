@@ -1,0 +1,4 @@
+rootProject.name = 'gameon-carroom'
+
+include 'carroom-app'
+include 'carroom-wlpcfg'
