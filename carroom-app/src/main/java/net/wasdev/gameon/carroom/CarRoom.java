@@ -125,16 +125,6 @@ public class CarRoom implements ServletContextListener {
     private static final String description = "There is simple wooden table in the centre of the room, there is the smell of burning rubber in the air.\n\n"
             + "Commands are : \n/left <lock 0 - 100>\n/right <lock 0 - 100>\n/forwards <seconds 0 - 10>\n/backwards <seconds 0 - 10>\n";
     
-    // for running against the real remote gameon.
-    //String registrationUrl = "https://game-on.org/map/v1/sites";
-    //String endPointUrl = "ws://<ip and port of host that gameon can reach>/rooms/simpleRoom
-
-    // for when running in a docker container with game-on all running
-    // locally.
-    
-    // credentials, obtained from the gameon instance to connect to.
-    private final String userId = "dummy.DevUser";  
-
     List<String> directions = Arrays.asList( "n", "s", "e", "w", "u", "d");
 
     private static long bookmark = 0;
@@ -143,12 +133,13 @@ public class CarRoom implements ServletContextListener {
     private final Map<String, String> exits = new HashMap<>();
     private final List<String> objects = new ArrayList<>();
     
-    //config values retrieved from JNDI
+    // config values retrieved from JNDI
+    // have a look in server.xml to find how these are set
     private final String registrationUrl;
     private final String endPointUrl;
-    private final String imageSvcUrl;
     private final String carEndPoint;
     private final String key;
+    private final String userId;
 
     public CarRoom() {
         registrationUrl = getJNDIEntry("mapSvcUrl");
@@ -165,11 +156,10 @@ public class CarRoom implements ServletContextListener {
         }
         endPointUrl = url; 
         System.out.println("Websocket endpoint " + endPointUrl);
-        imageSvcUrl = getJNDIEntry("imageSvcUrl");
-        System.out.println("Image service endpoint " + imageSvcUrl);
         carEndPoint = getJNDIEntry("carEndPoint");
         System.out.println("Car endpoint " + carEndPoint);
-        key = getJNDIEntry("devKey");  
+        key = getJNDIEntry("ownerKey");  
+        userId = getJNDIEntry("ownerId");  
         
         System.out.println("Websocket endpoint " + endPointUrl);
         exits.put("n", "A Large doorway to the north");
@@ -193,7 +183,6 @@ public class CarRoom implements ServletContextListener {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Room registration
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 
     /**
@@ -255,7 +244,7 @@ public class CarRoom implements ServletContextListener {
         // the jvm trust store.. so instead, we'll create an ssl config
         // that no longer cares.
         // This is handy for testing, but for production you'd probably
-        // want to goto the effort of setting up a truststore correctly.
+        // want to go to the effort of setting up a truststore correctly.
         SSLContext sslContext = null;
         try {
             sslContext = SSLContext.getInstance("SSL");
@@ -500,14 +489,7 @@ public class CarRoom implements ServletContextListener {
             }
         }
         
-        if(lowerContent.equals("/photo")) {
-            String photo = takePhoto();
-            EventBuilder.playerEvent(Collections.singletonList(session), userId, photo, null);
-            return;
-        }
-        
         if (lowerContent.startsWith("/go")) {
-
             String exitDirection = null;
             if (lowerContent.length() > 4) {
                 exitDirection = lowerContent.substring(4).toLowerCase();
@@ -855,47 +837,4 @@ public class CarRoom implements ServletContextListener {
         }, null, new URI(carEndPoint));
     }
     
-    //***********************************************************************************
-    // Camera control
-    //***********************************************************************************
-    
-    private String takePhoto() throws IOException {
-        String fileName = "/tmp/picam-car.jpg";
-        ProcessBuilder pb = new ProcessBuilder("raspistill", "-n", "-o", fileName, "-t", "1000");
-        Process p;
-        try {
-            p = pb.start();
-            p.waitFor();
-        } catch (InterruptedException e) {
-            throw new IOException(e);
-        }
-        
-        HttpPost post = new HttpPost(imageSvcUrl);
-        //post.addHeader("Content-Type", "multipart/form-data; boundary=----GameOnCameraRoom");
-        
-        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-        FileBody body = new FileBody(new File(fileName), ContentType.APPLICATION_OCTET_STREAM, fileName);
-        FormBodyPartBuilder fbuilder = FormBodyPartBuilder.create("image", body);
-        builder.addPart(fbuilder.build());
-        post.setEntity(builder.build());
-        HttpClientBuilder clientBuilder = HttpClientBuilder.create();
-        HttpClient client = clientBuilder.build();
-        HttpResponse response = client.execute(post);
-        
-        System.out.println("Image service request : ");
-        System.out.println("Headers : ");
-        for(Header header : post.getAllHeaders()) {
-            System.out.println("\t" + header.toString());
-        }
-        System.out.println("Image service response : " + response.getStatusLine());
-        System.out.println("Headers : ");
-        for(Header header : response.getAllHeaders()) {
-            System.out.println("\t" + header.toString());
-        }
-        StringBuilder txt = new StringBuilder("<pre style='font-family: \"Courier New\", Courier, monospace; font-size: .25em;'>");
-        txt.append(EntityUtils.toString(response.getEntity()));
-        txt.append("\n</pre>\n");
-        return txt.toString();
-    }
-
 }
