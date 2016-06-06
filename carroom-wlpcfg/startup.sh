@@ -34,6 +34,7 @@ else
   if [ "$CAR_URL" == "" ]; then
     export CAR_URL=ws://127.0.0.1:9080/LibertyCar/control
   fi
+  echo "CAR_URL=$CAR_URL"
   if [ "$REQUIRES_APP_REGISTRATION" == "" ]; then
     export REQUIRES_APP_REGISTRATION=false
   fi

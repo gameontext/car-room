@@ -89,9 +89,10 @@ public class RegistrationListener implements ServletContextListener {
         key = getJNDIEntry("ownerKey");  
         userId = getJNDIEntry("ownerId");  
         
-        requiresRegistration = Boolean.valueOf(getJNDIEntry("requiresRegistration"));
+        requiresRegistration = getBooleanJNDIEntry("requiresRegistration");
         
-        System.out.println("Websocket endpoint " + endPointUrl);
+        
+        System.out.println("Requires registration? " + requiresRegistration);
         exits.put("n", "A Large doorway to the north");
         exits.put("s", "A winding path leading off to the south");
         exits.put("e", "An overgrown road, covered in brambles");
@@ -100,7 +101,18 @@ public class RegistrationListener implements ServletContextListener {
         exits.put("d", "A tunnel, leading down into the earth");
         objects.add("Remote control car");
     }
+
     
+    
+    private Boolean getBooleanJNDIEntry(String string) {
+        try {
+            return (Boolean) new InitialContext().lookup(name);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     private String getJNDIEntry(String name) {
         try {
             return (String) new InitialContext().lookup(name);
