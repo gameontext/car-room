@@ -32,5 +32,8 @@
     <!-- This is the place that this room will talk to so it can send drive commands to the car -->
     <jndiEntry jndiName="carEndPoint" value="${env.CAR_URL}" />
 
+    <!-- This is the place that this room will talk to so it can send drive commands to the car -->
+    <jndiEntry jndiName="requiresRegistration" value="${env.REQUIRES_APP_REGISTRATION}" />
+
     <webApplication id="carroom-app" location="carroom-app.war" name="carroom-app"/>
 </server>
