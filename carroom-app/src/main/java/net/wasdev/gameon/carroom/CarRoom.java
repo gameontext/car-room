@@ -107,8 +107,7 @@ import net.wasdev.gameon.security.TheVeryTrustingTrustManager;
  * harder to see 'everything' needed for a room in one go.
  */
 @ServerEndpoint("/carRoom")
-@WebListener
-public class CarRoom implements ServletContextListener {
+public class CarRoom {
 
     private final static String USERNAME = "username";
     private final static String USERID = "userId";
@@ -125,16 +124,6 @@ public class CarRoom implements ServletContextListener {
     private static final String description = "There is simple wooden table in the centre of the room, there is the smell of burning rubber in the air.\n\n"
             + "Commands are : \n/left <lock 0 - 100>\n/right <lock 0 - 100>\n/forwards <seconds 0 - 10>\n/backwards <seconds 0 - 10>\n";
     
-    // for running against the real remote gameon.
-    //String registrationUrl = "https://game-on.org/map/v1/sites";
-    //String endPointUrl = "ws://<ip and port of host that gameon can reach>/rooms/simpleRoom
-
-    // for when running in a docker container with game-on all running
-    // locally.
-    
-    // credentials, obtained from the gameon instance to connect to.
-    private final String userId = "dummy.DevUser";  
-
     List<String> directions = Arrays.asList( "n", "s", "e", "w", "u", "d");
 
     private static long bookmark = 0;
@@ -143,35 +132,15 @@ public class CarRoom implements ServletContextListener {
     private final Map<String, String> exits = new HashMap<>();
     private final List<String> objects = new ArrayList<>();
     
-    //config values retrieved from JNDI
-    private final String registrationUrl;
-    private final String endPointUrl;
-    private final String imageSvcUrl;
+    // config values retrieved from JNDI
+    // have a look in server.xml to find how these are set
     private final String carEndPoint;
-    private final String key;
 
     public CarRoom() {
-        registrationUrl = getJNDIEntry("mapSvcUrl");
-        System.out.println("Registration endpoint " + registrationUrl);
         
-        String url = getJNDIEntry("carSvcUrl");
-        if(url == null) {
-            try {
-                url = System.getenv("HOSTNAME");
-                url = "ws://" + InetAddress.getByName(System.getenv("HOSTNAME")).getHostAddress() +":9080/car/carRoom";
-            } catch (UnknownHostException e) {
-                e.printStackTrace();
-            }
-        }
-        endPointUrl = url; 
-        System.out.println("Websocket endpoint " + endPointUrl);
-        imageSvcUrl = getJNDIEntry("imageSvcUrl");
-        System.out.println("Image service endpoint " + imageSvcUrl);
         carEndPoint = getJNDIEntry("carEndPoint");
         System.out.println("Car endpoint " + carEndPoint);
-        key = getJNDIEntry("devKey");  
         
-        System.out.println("Websocket endpoint " + endPointUrl);
         exits.put("n", "A Large doorway to the north");
         exits.put("s", "A winding path leading off to the south");
         exits.put("e", "An overgrown road, covered in brambles");
@@ -190,193 +159,6 @@ public class CarRoom implements ServletContextListener {
         return null;
     }
     
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    // Room registration
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-    /**
-     * Entry point at application start, we use this to test for & perform room registration.
-     */
-    @Override
-    public final void contextInitialized(final ServletContextEvent e) {
-
-        // check if we are already registered..
-        try {
-            configureSSL();
-
-            HttpURLConnection con = isAlreadyRegistered();
-            if (con.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                //if the result was 200, then we found a room with this id & owner..
-                //which is either a previous registration by us, or another room with
-                //the same owner & roomname
-                //We won't register our room in this case, although we _could_ choose
-                //do do an update instead.. (we'd need to parse the json response, and
-                //collect the room id, then do a PUT request with our new data.. )
-                System.out.println("We are already registered, so updating with a PUT");
-                String json = getJSONResponse(con);
-                JsonArray array = Json.createReader(new StringReader(json)).readArray();
-                JsonString id = array.getJsonObject(0).getJsonString("_id");
-                register("PUT", registrationUrl + "/" + id.getString());
-            } else {
-                register("POST", registrationUrl);
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            throw new RuntimeException(ex);
-        }
-    }
-    
-    private HttpURLConnection isAlreadyRegistered() throws Exception {
-     // build the query request.
-        String queryParams = "name=" + name + "&owner=" + userId;
-        
-        // build the complete query url..
-        System.out.println("Querying room registration using url " + registrationUrl);
-
-        URL u = new URL(registrationUrl + "?" + queryParams );
-        HttpURLConnection con = (HttpURLConnection) u.openConnection();
-        if(registrationUrl.startsWith("https://")) {
-            ((HttpsURLConnection)con).setHostnameVerifier(new TheNotVerySensibleHostnameVerifier());
-        }
-        con.setDoOutput(true);
-        con.setDoInput(true);
-        con.setRequestProperty("Content-Type", "application/json;");
-        con.setRequestProperty("Accept", "application/json,text/plain");
-        con.setRequestProperty("Method", "GET");
-        return con;
-    }
-    
-    private void configureSSL() {
-        TrustManager[] trustManager = new TrustManager[] {new TheVeryTrustingTrustManager()};
-
-        // We don't want to worry about importing the game-on cert into
-        // the jvm trust store.. so instead, we'll create an ssl config
-        // that no longer cares.
-        // This is handy for testing, but for production you'd probably
-        // want to goto the effort of setting up a truststore correctly.
-        SSLContext sslContext = null;
-        try {
-            sslContext = SSLContext.getInstance("SSL");
-            sslContext.init(null, trustManager, new java.security.SecureRandom());
-        } catch (NoSuchAlgorithmException ex) {
-            System.out.println("Error, unable to get algo SSL");
-        }catch (KeyManagementException ex) {
-            System.out.println("Key management exception!! ");
-        }
-
-        HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.getSocketFactory());
-    }
-    
-    private void register(String method, String registrationUrl) throws Exception {
-        System.out.println("Beginning registration.");
-        String registrationPayloadString = getRegistration();
-
-        Instant now = Instant.now();
-        String dateValue = now.toString();
-
-        String bodyHash = SecurityUtils.buildHash(registrationPayloadString);
-
-        System.out.println("Building hmac with "+userId+dateValue+bodyHash);
-        String hmac = SecurityUtils.buildHmac(Arrays.asList(new String[] {
-                                   userId,
-                                   dateValue,
-                                   bodyHash
-                               }),key);
-
-
-        // build the complete registration url..
-        System.out.println("Beginning registration using url " + registrationUrl);
-        URL u = new URL(registrationUrl);
-        HttpURLConnection con = (HttpURLConnection) u.openConnection();
-        if(registrationUrl.startsWith("https://")) {
-            ((HttpsURLConnection)con).setHostnameVerifier(new TheNotVerySensibleHostnameVerifier());
-        }
-        con.setDoOutput(true);
-        con.setDoInput(true);
-        con.setRequestProperty("Content-Type", "application/json;");
-        con.setRequestProperty("Accept", "application/json,text/plain");
-        con.setRequestProperty("Method", method);
-        con.setRequestProperty("gameon-id", userId);
-        con.setRequestProperty("gameon-date", dateValue);
-        con.setRequestProperty("gameon-sig-body", bodyHash);
-        con.setRequestProperty("gameon-signature", hmac);
-        con.setRequestMethod(method);
-        OutputStream os = con.getOutputStream();
-
-        os.write(registrationPayloadString.getBytes("UTF-8"));
-        os.close();
-
-        System.out.println("RegistrationPayload :\n "+registrationPayloadString);
-
-        int httpResult = con.getResponseCode();
-        if (httpResult == HttpURLConnection.HTTP_OK || httpResult == HttpURLConnection.HTTP_CREATED) {
-            System.out.println("Registration reports success.");
-            getJSONResponse(con);
-            // here we should remember the exits we're told about,
-            // so we can
-            // use them when the user does /go direction
-            // But we're not dealing with exits here (yet)..
-            // user's will have to /sos out of us .. (bad, but ok
-            // for now)
-        } else {
-            System.out.println(
-                    "Registration gave http code: " + con.getResponseCode() + " " + con.getResponseMessage());
-            // registration sends payload with info why registration
-            // failed.
-            try (BufferedReader buffer = new BufferedReader(
-                    new InputStreamReader(con.getErrorStream(), "UTF-8"))) {
-                String response = buffer.lines().collect(Collectors.joining("\n"));
-                System.out.println(response);
-            }
-            System.out.println("Room Registration FAILED .. this room has NOT been registered");
-        }
-    }
-    
-    private String getJSONResponse(HttpURLConnection con) throws Exception {
-        try (BufferedReader buffer = new BufferedReader(
-                new InputStreamReader(con.getInputStream(), "UTF-8"))) {
-            String response = buffer.lines().collect(Collectors.joining("\n"));
-            System.out.println("Response from server.");
-            System.out.println(response);
-            return response;
-        }
-    }
-    
-    //build the registration JSON for this room
-    private String getRegistration() {
-        System.out.println("Websocket endpoint " + endPointUrl);
-
-        JsonObjectBuilder registrationPayload = Json.createObjectBuilder();
-        // add the basic room info.
-        registrationPayload.add("name", name);
-        registrationPayload.add("fullName", fullName);
-        registrationPayload.add("description", description);
-        // add the doorway descriptions we'd like the game to use if it
-        // wires us to other rooms.
-        JsonObjectBuilder doors = Json.createObjectBuilder();
-        for(Entry<String, String> exit : exits.entrySet()) {
-            doors.add(exit.getKey(), exit.getValue());
-        }
-        registrationPayload.add("doors", doors.build());
-
-        // add the connection info for the room to connect back to us..
-        JsonObjectBuilder connInfo = Json.createObjectBuilder();
-        connInfo.add("type", "websocket"); // the only current supported
-                                           // type.
-        connInfo.add("target", endPointUrl);
-        registrationPayload.add("connectionDetails", connInfo.build());
-
-        return registrationPayload.build().toString();
-    }
-
-    @Override
-    public void contextDestroyed(ServletContextEvent sce) {
-        // Here we could deregister, if we wanted.. we'd need to read the registration/query
-        // response to cache the room id, so we could remove it as we shut down.
-    }
-
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Websocket methods..
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -500,14 +282,7 @@ public class CarRoom implements ServletContextListener {
             }
         }
         
-        if(lowerContent.equals("/photo")) {
-            String photo = takePhoto();
-            EventBuilder.playerEvent(Collections.singletonList(session), userId, photo, null);
-            return;
-        }
-        
         if (lowerContent.startsWith("/go")) {
-
             String exitDirection = null;
             if (lowerContent.length() > 4) {
                 exitDirection = lowerContent.substring(4).toLowerCase();
@@ -855,47 +630,4 @@ public class CarRoom implements ServletContextListener {
         }, null, new URI(carEndPoint));
     }
     
-    //***********************************************************************************
-    // Camera control
-    //***********************************************************************************
-    
-    private String takePhoto() throws IOException {
-        String fileName = "/tmp/picam-car.jpg";
-        ProcessBuilder pb = new ProcessBuilder("raspistill", "-n", "-o", fileName, "-t", "1000");
-        Process p;
-        try {
-            p = pb.start();
-            p.waitFor();
-        } catch (InterruptedException e) {
-            throw new IOException(e);
-        }
-        
-        HttpPost post = new HttpPost(imageSvcUrl);
-        //post.addHeader("Content-Type", "multipart/form-data; boundary=----GameOnCameraRoom");
-        
-        MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-        FileBody body = new FileBody(new File(fileName), ContentType.APPLICATION_OCTET_STREAM, fileName);
-        FormBodyPartBuilder fbuilder = FormBodyPartBuilder.create("image", body);
-        builder.addPart(fbuilder.build());
-        post.setEntity(builder.build());
-        HttpClientBuilder clientBuilder = HttpClientBuilder.create();
-        HttpClient client = clientBuilder.build();
-        HttpResponse response = client.execute(post);
-        
-        System.out.println("Image service request : ");
-        System.out.println("Headers : ");
-        for(Header header : post.getAllHeaders()) {
-            System.out.println("\t" + header.toString());
-        }
-        System.out.println("Image service response : " + response.getStatusLine());
-        System.out.println("Headers : ");
-        for(Header header : response.getAllHeaders()) {
-            System.out.println("\t" + header.toString());
-        }
-        StringBuilder txt = new StringBuilder("<pre style='font-family: \"Courier New\", Courier, monospace; font-size: .25em;'>");
-        txt.append(EntityUtils.toString(response.getEntity()));
-        txt.append("\n</pre>\n");
-        return txt.toString();
-    }
-
 }

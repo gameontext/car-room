@@ -19,5 +19,24 @@ if [ "$ETCDCTL_ENDPOINT" != "" ]; then
   sleep 0.5
   ./forwarder --config ./forwarder.conf
 else
+  if [ "$CONNECTION_URL" == "" ]; then
+    export CONNECTION_URL=ws://127.0.0.1:9080/cars/carRoom
+  fi
+  if [ "$MAP_URL" == "" ]; then
+    export MAP_URL=http://127.0.0.1:9080/map/v1/sites
+  fi
+  if [ "$OWNER_ID" == "" ]; then
+    export OWNER_ID=dummy.DevUser
+  fi
+  if [ "$OWNER_KEY" == "" ]; then
+    export OWNER_KEY=TODO_CHANGE_ME
+  fi
+  if [ "$CAR_URL" == "" ]; then
+    export CAR_URL=ws://127.0.0.1:9080/LibertyCar/control
+  fi
+  if [ "$REQUIRES_APP_REGISTRATION" == "" ]; then
+    export REQUIRES_APP_REGISTRATION=false
+  fi
+
   /opt/ibm/wlp/bin/server run defaultServer
 fi

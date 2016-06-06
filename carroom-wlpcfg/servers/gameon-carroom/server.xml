@@ -1,8 +1,8 @@
-<server description="Game On! SimpleRoom Service">
+<server description="Game On! CarRoom Service">
 
     <!-- Enable features -->
     <featureManager>
-		<feature>websocket-1.1</feature>
+        <feature>websocket-1.1</feature>
         <feature>jsonp-1.0</feature>
         <feature>jndi-1.0</feature>
     </featureManager>
@@ -10,20 +10,30 @@
     <!-- To access this server from a remote client add a host attribute to the following element, e.g. host="*" -->
     <httpEndpoint host="*" httpPort="9080"  id="defaultHttpEndpoint"/>
 
-	<logging traceSpecification="*=info"/>
+    <logging traceSpecification="*=info"/>
 
-	<!-- This is required to prevent the web apps from being lazily loaded -->
-	<webContainer deferServletLoad="false"/>
+    <!-- This is required to prevent the web apps from being lazily loaded -->
+    <webContainer deferServletLoad="false"/>
 
     <applicationMonitor dropinsEnabled="false"/>
     
-    <jndiEntry jndiName="imageSvcUrl" value="http://192.168.0.103:8000/user"/>
-    <!--
-    <jndiEntry jndiName="carSvcUrl" value="ws://192.168.0.103:5060/cars/carRoom"/>
-     -->
-    <jndiEntry jndiName="mapSvcUrl" value="http://192.168.0.103:6080/map/v1/sites"/>
-    <jndiEntry jndiName="devKey" value="nxsXJdYYSAKWuyIoQ9zFakefLvL04Ullgx+DihgEZz0="/>
-    <jndiEntry jndiName="carEndPoint" value="ws://192.168.0.100:9080/LibertyCar/control"/>
+    <!-- The place that this service will be availble on. This is what GameOn will try to connect a player to -->
+    <jndiEntry jndiName="carSvcUrl" value="${env.CONNECTION_URL}"/>
+
+    <!-- This is the location where new rooms need to be registered -->
+    <jndiEntry jndiName="mapSvcUrl" value="${env.MAP_URL}"/>
+
+    <!-- This is your developer key that you can find in your profile in GameOn -->
+    <jndiEntry jndiName="ownerKey" value="${env.OWNER_KEY}" />
+
+    <!-- This is the long ID associated with your account. This is found under your profile in GameOn -->
+    <jndiEntry jndiName="ownerId" value="${env.OWNER_ID}" />
+
+    <!-- This is the place that this room will talk to so it can send drive commands to the car -->
+    <jndiEntry jndiName="carEndPoint" value="${env.CAR_URL}" />
+
+    <!-- This is the place that this room will talk to so it can send drive commands to the car -->
+    <jndiEntry jndiName="requiresRegistration" value="${env.REQUIRES_APP_REGISTRATION}" />
 
     <webApplication id="carroom-app" location="carroom-app.war" name="carroom-app"/>
 </server>
