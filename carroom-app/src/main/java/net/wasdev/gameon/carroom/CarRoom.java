@@ -138,7 +138,7 @@ public class CarRoom {
 
     public CarRoom() {
         
-        carEndPoint = getJNDIEntry("carEndPoint");
+        carEndPoint = "ws://" + getJNDIEntry("carEndPoint");
         System.out.println("Car endpoint " + carEndPoint);
         
         exits.put("n", "A Large doorway to the north");

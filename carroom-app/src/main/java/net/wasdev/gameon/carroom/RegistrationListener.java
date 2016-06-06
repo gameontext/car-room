@@ -104,7 +104,7 @@ public class RegistrationListener implements ServletContextListener {
 
     
     
-    private Boolean getBooleanJNDIEntry(String string) {
+    private Boolean getBooleanJNDIEntry(String name) {
         try {
             return (Boolean) new InitialContext().lookup(name);
         } catch (Exception e) {
