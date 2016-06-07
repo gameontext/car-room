@@ -59,3 +59,4 @@ fi
 ######################################################################################
 echo "IMAGE_NAME=${FULL_REPOSITORY_NAME}" >> $ARCHIVE_DIR/build.properties
 cp icsDeploy.sh $ARCHIVE_DIR/icsDeploy.sh
+cp registrationTemplate.json $ARCHIVE_DIR/registrationTemplate.json
