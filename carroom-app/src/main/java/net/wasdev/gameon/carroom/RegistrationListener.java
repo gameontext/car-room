@@ -184,7 +184,7 @@ public class RegistrationListener implements ServletContextListener {
     private void configureSSL() {
         TrustManager[] trustManager = new TrustManager[] {new TheVeryTrustingTrustManager()};
 
-        // We don't want to worry about importing the game-on cert into
+        // We don't want to worry about importing the game on cert into
         // the jvm trust store.. so instead, we'll create an ssl config
         // that no longer cares.
         // This is handy for testing, but for production you'd probably
